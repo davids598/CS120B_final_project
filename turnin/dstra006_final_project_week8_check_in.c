@@ -4,10 +4,10 @@
  *	Assignment: Final Project, Check-in #1
  *	Exercise Description: [optional - include for your own benefit]
  *
- *  Link to Vid:
- *
  *	I acknowledge all content contained herein, excluding template or example
  *	code, is my own original work.
+ *
+ *  Demo Link: https://youtu.be/QEJma8zg0ls 
  */
 #include <avr/io.h>
 #include "../header/timer.h"
