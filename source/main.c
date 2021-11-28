@@ -1,7 +1,7 @@
 /*	Author: David Strathman
  *  Partner(s) Name:
  *	Lab Section:
- *	Assignment: Final Project, Check-in #1
+ *	Assignment: Final Project, Check-in #2
  *	Exercise Description: [optional - include for your own benefit]
  *
  *  Link to Vid:
@@ -40,6 +40,9 @@ short ADC_Switch_Ch(char ch) {
 //----------------------------------Globals-------------------------------------
 enum Joystick1_positions {J1_UP, J1_DOWN, J1_LEFT, J1_RIGHT, J1_NEUTRAL} Joystick1_position; //Runner
 enum Joystick2_positions {J2_UP, J2_DOWN, J2_LEFT, J2_RIGHT, J2_NEUTRAL} Joystick2_position; //Opponent
+char top_row[16] = { };
+char bottom_row[16] = { };
+unsigned char runnerPos = 0;
 //----------------------------------Task 1---------------------------------------
 enum joystick_checks { joystick_check };
 
@@ -93,10 +96,8 @@ int Output(int state) {
       PORTC = PORTC & 0x3F;
       if (Joystick1_position == J1_LEFT) {
         PORTC = PORTC | 0x80;
-        LCD_Cursor(1);
       } else if (Joystick1_position == J1_RIGHT) {
         PORTC = PORTC | 0x40;
-        LCD_Cursor(17);
       }
       //Joystick 2 outputs
       PORTC = PORTC & 0xC7;
@@ -107,6 +108,107 @@ int Output(int state) {
       } else if (Joystick2_position == J2_RIGHT) {
         PORTC = PORTC | 0x08;
       }
+  }
+  return state;
+}
+//------------------------------Task 3------------------------------------------
+enum gameInputs { gameinputloop };
+
+int playerInput(int state) {
+  switch (state) {
+    case gameinputloop: state = gameinputloop; break;
+    default:  state = gameinputloop; break;
+  }
+
+  switch (state) {
+    case gameinputloop:
+      //Read runner joystick input
+      if (Joystick1_position == J1_RIGHT) {
+        LCD_Cursor(1);
+        runnerPos = 0;
+      }
+      else if (Joystick1_position == J1_LEFT) {
+        LCD_Cursor(17);
+        runnerPos = 1;
+      } else {
+        //wiping values at end of rows
+        LCD_Cursor(16);
+        LCD_WriteData(" ");
+        LCD_Cursor(32);
+        LCD_WriteData(" ");
+        //No runner input detected, going to previous location
+        if (runnerPos == 0) {
+          LCD_Cursor(1);
+        } else {
+          LCD_Cursor(17);
+        }
+      }
+  }
+  return state;
+}
+//------------------------------Task 4------------------------------------------
+enum GameOutputs { gameoutputloop, gameoutputhold };
+
+int gameOutput(int state) {
+  switch (state) {
+    case gameoutputloop:
+      if (top_row[0] == 1 && runnerPos == 0) {
+        state = gameoutputhold;
+        LCD_ClearScreen();
+        LCD_DisplayString(1, "Game Over");
+      }
+      else if (bottom_row[0] == 1 && runnerPos == 1) {
+        state = gameoutputhold;
+        LCD_ClearScreen();
+        LCD_DisplayString(1, "Game Over");
+      } else {
+        state = gameoutputloop;
+      }
+      break;
+    case gameoutputhold: state = gameoutputhold; break;
+    default:  state = gameoutputloop; break;
+  }
+
+  switch (state) {
+    case gameoutputloop:
+      //Update position of obstacles
+      for (int i = 0; i < 16 - 1; ++i) {
+        if (top_row[i+1] == 1) {
+          top_row[i+1] = 0;
+          LCD_Cursor(i+1);
+          LCD_WriteData(" ");
+          top_row[i] = 1;
+          LCD_Cursor(i);
+          LCD_WriteData('#');
+        }
+      }
+
+      for (int i = 0; i < 16 - 1; ++i) {
+        if (bottom_row[i+1] == 1){
+          bottom_row[i+1] = 0;
+          LCD_Cursor(i+1+16);
+          LCD_WriteData(" ");
+          bottom_row[i] = 1;
+          LCD_Cursor(i+16);
+          LCD_WriteData('#');
+        }
+      }
+      //Remove values at position 0 of each row
+      top_row[0] = 0;
+      bottom_row[0] = 0;
+      //Read opponent Joystick input
+      if (Joystick2_position == J2_LEFT) {
+        bottom_row[15] = 1;
+        LCD_Cursor(32);
+        LCD_WriteData('#');
+      }
+      if (Joystick2_position == J2_RIGHT) {
+        top_row[15] = 1;
+        LCD_Cursor(16);
+        LCD_WriteData('#');
+      }
+      break;
+    case gameoutputhold: break;
   }
   return state;
 }
@@ -128,8 +230,8 @@ int main(void) {
   DDRC = 0xFF; PORTC = 0x00; //Output
   DDRD = 0xFF; PORTD = 0x00; //Output
 
-  static task task1, task2;
-  task *tasks[] = { &task1, &task2 };
+  static task task1, task2, task3, task4;
+  task *tasks[] = { &task1, &task2, &task3, &task4 };
   const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
   const char start = -1;
@@ -144,6 +246,16 @@ int main(void) {
   task2.period = 10;
   task2.elapsedTime = task2.period;
   task2.TickFct = &Output;
+  //Task 3
+  task3.state = start;
+  task3.period = 10;
+  task3.elapsedTime = task3.period;
+  task3.TickFct = &playerInput;
+  //Task 4
+  task4.state = start;
+  task4.period = 150;
+  task4.elapsedTime = task4.period;
+  task4.TickFct = &gameOutput;
 
   unsigned long GCD = tasks[0]->period;
   for (int i = 1; i < numTasks; i++) {
