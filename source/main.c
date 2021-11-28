@@ -151,20 +151,7 @@ enum GameOutputs { gameoutputloop, gameoutputhold };
 
 int gameOutput(int state) {
   switch (state) {
-    case gameoutputloop:
-      if (top_row[0] == 1 && runnerPos == 0) {
-        state = gameoutputhold;
-        LCD_ClearScreen();
-        LCD_DisplayString(1, "Game Over");
-      }
-      else if (bottom_row[0] == 1 && runnerPos == 1) {
-        state = gameoutputhold;
-        LCD_ClearScreen();
-        LCD_DisplayString(1, "Game Over");
-      } else {
-        state = gameoutputloop;
-      }
-      break;
+    case gameoutputloop:  break;
     case gameoutputhold: state = gameoutputhold; break;
     default:  state = gameoutputloop; break;
   }
@@ -192,6 +179,19 @@ int gameOutput(int state) {
           LCD_Cursor(i+16);
           LCD_WriteData('#');
         }
+      }
+      //Check for contact
+      if (top_row[0] == 1 && runnerPos == 0) {
+        state = gameoutputhold;
+        LCD_ClearScreen();
+        LCD_DisplayString(3, "Game Over");
+      }
+      else if (bottom_row[0] == 1 && runnerPos == 1) {
+        state = gameoutputhold;
+        LCD_ClearScreen();
+        LCD_DisplayString(3, "Game Over");
+      } else {
+        state = gameoutputloop;
       }
       //Remove values at position 0 of each row
       top_row[0] = 0;
@@ -263,6 +263,7 @@ int main(void) {
   }
   TimerSet(GCD);
   TimerOn();
+  //Extra Setup
   ADC_init();
   LCD_init();
   LCD_ClearScreen();
