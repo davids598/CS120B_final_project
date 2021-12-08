@@ -78,3 +78,14 @@ void delay_ms(int miliSec) //for 8 Mhz crystal
    asm("nop");
   }
 }
+void LCD_Custom_Char (unsigned char loc, unsigned char *msg)
+{
+    unsigned char i;
+    if(loc<8)
+    {
+     LCD_WriteCommand(0x40 + (loc*8));  /* Command 0x40 and onwards forces
+                                       the device to point CGRAM address */
+       for(i=0;i<8;i++)  /* Write 8 byte for generation of 1 character */
+           LCD_WriteData(msg[i]);
+    }
+}
