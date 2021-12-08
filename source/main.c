@@ -40,8 +40,8 @@ short ADC_Switch_Ch(char ch) {
 //----------------------------------Globals-------------------------------------
 enum Joystick1_positions {J1_UP, J1_DOWN, J1_LEFT, J1_RIGHT, J1_NEUTRAL} Joystick1_position; //Runner
 enum Joystick2_positions {J2_UP, J2_DOWN, J2_LEFT, J2_RIGHT, J2_NEUTRAL} Joystick2_position; //Opponent
-char top_row[16] = { };
-char bottom_row[16] = { };
+char top_row[17] = { };
+char bottom_row[17] = { };
 unsigned char runnerPos = 0;
 //----------------------------------Task 1---------------------------------------
 enum joystick_checks { joystick_check };
@@ -122,6 +122,11 @@ int playerInput(int state) {
 
   switch (state) {
     case gameinputloop:
+      //wiping values at end of rows
+      //LCD_Cursor(16);
+      //LCD_WriteData("");
+      //LCD_Cursor(32);
+      //LCD_WriteData("");
       //Read runner joystick input
       if (Joystick1_position == J1_RIGHT) {
         LCD_Cursor(1);
@@ -131,11 +136,6 @@ int playerInput(int state) {
         LCD_Cursor(17);
         runnerPos = 1;
       } else {
-        //wiping values at end of rows
-        LCD_Cursor(16);
-        LCD_WriteData(" ");
-        LCD_Cursor(32);
-        LCD_WriteData(" ");
         //No runner input detected, going to previous location
         if (runnerPos == 0) {
           LCD_Cursor(1);
@@ -143,6 +143,7 @@ int playerInput(int state) {
           LCD_Cursor(17);
         }
       }
+      break;
   }
   return state;
 }
@@ -159,24 +160,28 @@ int gameOutput(int state) {
   switch (state) {
     case gameoutputloop:
       //Update position of obstacles
-      for (int i = 0; i < 16 - 1; ++i) {
+      for (int i = 0; i < 16; ++i) {
         if (top_row[i+1] == 1) {
           top_row[i+1] = 0;
-          LCD_Cursor(i+1);
-          LCD_WriteData(" ");
+          if (i < 15) {
+            LCD_Cursor(i+1+1);
+            LCD_WriteData(" ");
+          }
           top_row[i] = 1;
-          LCD_Cursor(i);
+          LCD_Cursor(i+1);
           LCD_WriteData('#');
         }
       }
 
-      for (int i = 0; i < 16 - 1; ++i) {
+      for (int i = 0; i < 16; ++i) {
         if (bottom_row[i+1] == 1){
           bottom_row[i+1] = 0;
-          LCD_Cursor(i+1+16);
-          LCD_WriteData(" ");
+          if (i < 15) {
+            LCD_Cursor(i+1+16+1);
+            LCD_WriteData(" ");
+          }
           bottom_row[i] = 1;
-          LCD_Cursor(i+16);
+          LCD_Cursor(i+16+1);
           LCD_WriteData('#');
         }
       }
@@ -195,17 +200,21 @@ int gameOutput(int state) {
       }
       //Remove values at position 0 of each row
       top_row[0] = 0;
+      LCD_Cursor(1);
+      LCD_WriteData(" ");
       bottom_row[0] = 0;
+      LCD_Cursor(17);
+      LCD_WriteData(" ");
       //Read opponent Joystick input
       if (Joystick2_position == J2_LEFT) {
-        bottom_row[15] = 1;
-        LCD_Cursor(32);
-        LCD_WriteData('#');
+        bottom_row[16] = 1;
+        //LCD_Cursor(32);
+        //LCD_WriteData('#');
       }
       if (Joystick2_position == J2_RIGHT) {
-        top_row[15] = 1;
-        LCD_Cursor(16);
-        LCD_WriteData('#');
+        top_row[16] = 1;
+        //LCD_Cursor(16);
+        //LCD_WriteData('#');
       }
       break;
     case gameoutputhold: break;
