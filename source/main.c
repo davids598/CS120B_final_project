@@ -12,6 +12,7 @@
 #include <avr/io.h>
 #include "../header/timer.h"
 #include "../header/io.h"
+#include <avr/eeprom.h>
 #ifdef _SIMULATE_
 #include "simAVRHeader.h"
 #endif
@@ -43,6 +44,33 @@ enum Joystick2_positions {J2_UP, J2_DOWN, J2_LEFT, J2_RIGHT, J2_NEUTRAL} Joystic
 char top_row[17] = { };
 char bottom_row[17] = { };
 unsigned char runnerPos = 0;
+unsigned short timer = 0;
+unsigned char max_time = 0;
+unsigned char start = 0;
+unsigned char high_score = 0;
+unsigned char reset = 0;
+unsigned char currC = 0;
+unsigned char game_over = 0;
+//--------------------------------Custom Characters------------------------------
+/*
+unsigned char Character1[8] = {
+  0x0E,
+  0x0A,
+  0x0E,
+  0x04,
+  0x04,
+  0x04,
+  0x0A,
+  0x11
+};
+unsigned char Character2[8] = { 0x00, 0x0E, 0x1F, 0x15, 0x1B, 0x0E, 0x0A, 0x00 }; // Skull
+unsigned char Character3[8] = { 0x11, 0x0E, 0x04, 0x0E, 0x1F, 0x0E, 0x0E, 0x1B }; // Alian
+unsigned char Character4[8] = { 0x04, 0x0E, 0x0E, 0x0E, 0x1F, 0x0E, 0x04, 0x04 }; // Sword
+unsigned char Character5[8] = { 0x00, 0x0E, 0x15, 0x1F, 0x1F, 0x15, 0x00, 0x00 }; // Ghost
+unsigned char Character6[8] = { 0x0A, 0x0A, 0x1F, 0x11, 0x11, 0x0E, 0x04, 0x04 }; // Plug
+unsigned char Character7[8] = { 0x00, 0x00, 0x15, 0x15, 0x1F, 0x1F, 0x00, 0x00 }; // Crown
+unsigned char Character8[8] = { 0x00, 0x0A, 0x1F, 0x1F, 0x0E, 0x04, 0x00, 0x00 }; // Heart
+*/
 //----------------------------------Task 1---------------------------------------
 enum joystick_checks { joystick_check };
 
@@ -57,6 +85,9 @@ int joystick_Reading(int state) {
 
   switch (state) {
     case joystick_check:
+      currC = ~PINC;
+      start = (currC & 0x01);
+      reset = (currC & 0x02);
       runner_x = ADC_Switch_Ch(0x00);
       opponent_x = ADC_Switch_Ch(0x02);
       opponent_y = ADC_Switch_Ch(0x03);
@@ -130,17 +161,21 @@ int playerInput(int state) {
       //Read runner joystick input
       if (Joystick1_position == J1_RIGHT) {
         LCD_Cursor(1);
+        //LCD_Custom_Char(1, Character1);
         runnerPos = 0;
       }
       else if (Joystick1_position == J1_LEFT) {
         LCD_Cursor(17);
+        //LCD_Custom_Char(17, Character1);
         runnerPos = 1;
       } else {
         //No runner input detected, going to previous location
         if (runnerPos == 0) {
           LCD_Cursor(1);
+          //LCD_Custom_Char(1, Character1);
         } else {
           LCD_Cursor(17);
+          //LCD_Custom_Char(1, Character1);
         }
       }
       break;
@@ -148,16 +183,26 @@ int playerInput(int state) {
   return state;
 }
 //------------------------------Task 4------------------------------------------
-enum GameOutputs { gameoutputloop, gameoutputhold };
+enum GameOutputs { gameoutput_start, gameoutputloop, gameoutputhold };
 
 int gameOutput(int state) {
+  unsigned char displayed_string;
   switch (state) {
-    case gameoutputloop:  break;
-    case gameoutputhold: state = gameoutputhold; break;
-    default:  state = gameoutputloop; break;
+    case gameoutput_start: if (start == 0) {state = gameoutput_start;} else {state = gameoutputloop;} break;
+    case gameoutputloop:  state = gameoutputloop; break;
+    case gameoutputhold:  if (reset == 0) {state = gameoutputhold;} else {state = gameoutput_start; game_over = 0;} break;
+    default:  state = gameoutput_start; break;
   }
 
   switch (state) {
+    case gameoutput_start:
+      top_row[0] = 0;
+      bottom_row[0] = 0;
+      for (int i = 0; i < 17; i++) {
+        top_row[i] = 0;
+        bottom_row[i] = 0;
+      }
+      break;
     case gameoutputloop:
       //Update position of obstacles
       for (int i = 0; i < 16; ++i) {
@@ -188,13 +233,21 @@ int gameOutput(int state) {
       //Check for contact
       if (top_row[0] == 1 && runnerPos == 0) {
         state = gameoutputhold;
+        max_time = timer;
         LCD_ClearScreen();
-        LCD_DisplayString(3, "Game Over");
+        LCD_DisplayString(2, "Game Over Press Reset to start");
+        //LCD_DisplayString(17, "Time:");
+        //LCD_DisplayString(22, max_time);
+        game_over = 1;
       }
       else if (bottom_row[0] == 1 && runnerPos == 1) {
         state = gameoutputhold;
+        max_time = timer;
         LCD_ClearScreen();
-        LCD_DisplayString(3, "Game Over");
+        LCD_DisplayString(2, "Game Over Press Reset to start");
+        //LCD_DisplayString(17, "Time:");
+        //LCD_DisplayString(22, max_time);
+        game_over = 1;
       } else {
         state = gameoutputloop;
       }
@@ -221,6 +274,99 @@ int gameOutput(int state) {
   }
   return state;
 }
+//------------------------------Task 5------------------------------------------
+enum Timer_states {timer_start, timer_loop};
+
+int Timer(int state) {
+  switch (state) {
+    case timer_start: if (start == 0) {state = timer_start;} else {state = timer_loop;} break;
+    case timer_loop:  if (reset == 0) {state = timer_loop;} else {state = timer_start;} break;
+      default:  state = output_loop; break;
+  }
+
+  switch (state) {
+    case timer_start: timer = 0; break;
+    case timer_loop:
+        timer = timer + 1;
+      break;
+  }
+  return state;
+}
+//-------------------------------Task 6-----------------------------------------
+enum Menu_states {menu_read, menu_display, menu_loop, menu_hold};
+
+int menu(int state) {
+  unsigned char high_score_string = 0;
+  switch (state) {
+    case menu_read: state = menu_display; break;
+    case menu_display: state = menu_loop; break;
+    case menu_hold: if (reset == 0) {state = menu_hold;} else {state = menu_read;} break;
+    case menu_loop: if (start == 0) {state = menu_loop;} else { state = menu_hold; LCD_ClearScreen(); } break;
+    default: state = menu_read; break;
+  }
+
+  switch (state) {
+    case menu_read:
+      high_score = eeprom_read_byte(0x0);
+      if (high_score > 0x39 || high_score < 0x30) {
+        high_score = 0x31;
+      }
+      break;
+    case menu_display:
+      LCD_ClearScreen();
+      LCD_DisplayString(2, "Welcome        Highest Level:");
+      LCD_Cursor(32);
+      LCD_WriteData(high_score);
+      break;
+    case menu_loop:
+
+      break;
+    case menu_hold:
+      break;
+  }
+  return state;
+}
+//------------------------------Task 7------------------------------------------
+enum Store_High_Score_states {hs_start, hs_check, hs_hold};
+
+int High_score_check(int state) {
+  switch (state) {
+    case hs_start:  if (game_over == 0) {state = hs_start;} else {state = hs_check;} break;
+    case hs_check:  state = hs_hold; break;
+    case hs_hold: if (reset == 0) {state = hs_hold;} else {state = hs_start;} break;
+    default: state = hs_start; break;
+  }
+
+  switch (state) {
+    case hs_start: break;
+    case hs_hold: break;
+    case hs_check:
+      if (max_time > (high_score - 0x30)*10) {
+        if (max_time < 10) {
+          eeprom_write_byte(0x0, 0x31);
+        } else if (max_time < 20) {
+          eeprom_write_byte(0x0, 0x32);
+        } else if (max_time < 30) {
+          eeprom_write_byte(0x0, 0x33);
+        } else if (max_time < 40) {
+          eeprom_write_byte(0x0, 0x34);
+        } else if (max_time < 50) {
+          eeprom_write_byte(0x0, 0x35);
+        } else if (max_time < 60) {
+          eeprom_write_byte(0x0, 0x36);
+        } else if (max_time < 70) {
+          eeprom_write_byte(0x0, 0x37);
+        } else if (max_time < 80) {
+          eeprom_write_byte(0x0, 0x38);
+        } else if (max_time < 90) {
+          eeprom_write_byte(0x0, 0x39);
+        } else {
+          eeprom_write_byte(0x0, 0x24);
+        }
+      }
+  }
+  return state;
+}
 //---------------------------Main and GCD---------------------------------------
 unsigned long int findGCD(unsigned long int a, unsigned long int b) {
   unsigned long int c;
@@ -236,11 +382,11 @@ unsigned long int findGCD(unsigned long int a, unsigned long int b) {
 int main(void) {
   DDRA = 0x00; PORTA = 0xFF; //Input
   DDRB = 0xFF; PORTB = 0x00; //Output
-  DDRC = 0xFF; PORTC = 0x00; //Output
+  DDRC = 0xFC; PORTC = 0x03; //Output
   DDRD = 0xFF; PORTD = 0x00; //Output
 
-  static task task1, task2, task3, task4;
-  task *tasks[] = { &task1, &task2, &task3, &task4 };
+  static task task1, task2, task3, task4, task5, task6, task7;
+  task *tasks[] = { &task1, &task2, &task3, &task4, &task5, &task6, &task7 };
   const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 
   const char start = -1;
@@ -265,6 +411,21 @@ int main(void) {
   task4.period = 150;
   task4.elapsedTime = task4.period;
   task4.TickFct = &gameOutput;
+  //Task 5
+  task5.state = start;
+  task5.period = 1000;
+  task5.elapsedTime = task5.period;
+  task5.TickFct = &Timer;
+  //Task 6
+  task6.state = start;
+  task6.period = 1000;
+  task6.elapsedTime = task6.period;
+  task6.TickFct = &menu;
+  //Task 7
+  task7.state = start;
+  task7.period = 200;
+  task7.elapsedTime = task7.period;
+  task7.TickFct = &High_score_check;
 
   unsigned long GCD = tasks[0]->period;
   for (int i = 1; i < numTasks; i++) {
